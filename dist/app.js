@@ -100,19 +100,82 @@
     const grid = document.querySelector('#work-grid');
     const count = document.querySelector('#result-count');
     const filters = Array.from(document.querySelectorAll('[data-filter]'));
+    const order = ['fuzhou-ip', 'book-posters', 'flowers', 'nuo', 'packaging', 'radio', 'cafe', 'city-poster', 'coconut', 'forest', 'mood', 'storybook'];
+    const rank = id => order.includes(id) ? order.indexOf(id) : order.length;
+    const curated = [...projects].sort((a, b) => rank(a.id) - rank(b.id));
+    const thumbs = new Set([...projects.map(work => work.cover), 'poster-sea', 'poster-seventh', 'poster-no-image', 'poster-birds', 'aigc-snow']);
+    const coverImage = (name, priority = 'lazy', sizes = '(max-width: 760px) calc(100vw - 40px), 60vw') => {
+      const [w, h] = sizeOf(name);
+      const tw = name === 'poster-birds' ? 848 : Math.min(w, Math.round(w * Math.min(1, (name.startsWith('poster-') ? 1200 : 900) / Math.max(w, h))));
+      const responsive = thumbs.has(name) && tw < w ? ` srcset="${thumbnailUrl(name)} ${tw}w, ${imageUrl(name)} ${w}w" sizes="${['aigc-radio', 'aigc-snow'].includes(name) ? '(max-width: 760px) calc(100vw - 40px), 100vw' : sizes}"` : '';
+      return `<img src="${thumbs.has(name) ? thumbnailUrl(name) : imageUrl(name)}"${responsive} alt="" width="${w}" height="${h}" loading="${priority === 'lazy' ? 'lazy' : 'eager'}" fetchpriority="${priority === 'high' ? 'high' : 'auto'}" decoding="async">`;
+    };
+    const layer = (markup, second = false) => `<div class="cover-layer ${second ? 'cover-layer--alternate' : ''}">${markup}</div>`;
+    const cover = work => {
+      if (work.id === 'fuzhou-ip') {
+        const characters = names => names.map((name, i) => artworkImage(name, '', true, i === 1 ? 'high' : 'eager')).join('');
+        return ['ip', layer(characters(['ip-black', 'ip-lin', 'ip-white'])) + layer(characters(['ip-yaba', 'ip-lin', 'ip-fufu']), true)];
+      }
+      if (work.id === 'book-posters') {
+        const sheets = names => names.map(name => `<span class="cover-sheet">${coverImage(name, 'eager', '(max-width: 760px) 55vw, 30vw')}</span>`).join('');
+        return ['posters', layer(sheets(['poster-sea', 'poster-birds', 'poster-no-image'])) + layer(sheets(['poster-seventh', 'poster-no-image', 'poster-birds']), true)];
+      }
+      if (['flowers', 'cafe'].includes(work.id)) {
+        const pages = names => names.map(name => `<span class="cover-page">${coverImage(name, 'lazy', '(max-width: 760px) 60vw, 32vw')}</span>`).join('');
+        const images = work.id === 'flowers' ? ['flowers-opening', 'flowers-tulip', 'flowers-cover'] : ['cafe-contents', 'cafe-spread', 'cafe-cover'];
+        return ['books', layer(pages(images)) + layer(pages([images[2], work.gallery.at(-1).image, images[1]]), true)];
+      }
+      if (work.id === 'nuo') return ['nuo', layer(coverImage('nuo-mask')) + layer(`<div class="cover-info-sheet">${coverImage('nuo-cover')}</div><div class="cover-info-sheet">${coverImage('nuo-detail')}</div>`, true)];
+      if (work.id === 'packaging') return ['photo', layer(coverImage(work.cover)) + layer(coverImage('packaging-detail'), true)];
+      if (work.id === 'radio') return ['radio', layer(coverImage(work.cover)) + layer(coverImage('aigc-snow'), true)];
+      return [work.id === 'mood' ? 'interface' : work.id === 'storybook' ? 'storybook' : work.id === 'city-poster' ? 'city' : 'art', layer(coverImage(work.cover))];
+    };
+    const cards = new Map(curated.map(work => {
+      const [kind, composition] = cover(work);
+      const card = document.createElement('a');
+      card.href = projectUrl(work);
+      card.dataset.work = work.id;
+      card.setAttribute('aria-label', `${work.name}，${work.category}，查看项目`);
+      card.innerHTML = `<div class="work-visual cover-${kind}" aria-hidden="true">${composition}</div><div class="work-card-meta"><div><h2>${escape(work.name)}</h2><p>${escape(work.category)}</p></div><span class="work-card-arrow" aria-hidden="true">↗</span></div>`;
+      return [work.id, card];
+    }));
+    const more = document.createElement('div');
+    more.className = 'work-section-break';
+    more.innerHTML = '<h2>更多创作</h2><p>在不同媒介中继续尝试。</p>';
+    let activeFilter;
     const show = (filter, animate = false) => {
-      const matches = filter === 'all' ? projects : projects.filter(work => work.tags.includes(filter));
-      grid.innerHTML = matches.map(work => `<a class="work-item" data-shape="${shapeOf(work.cover)}" href="${projectUrl(work)}"><div class="work-image" style="--paper:${work.color}"><img src="${thumbnailUrl(work.cover)}" alt="${escape(work.name)}作品封面" loading="lazy" width="${sizeOf(work.cover)[0]}" height="${sizeOf(work.cover)[1]}"><span class="work-arrow" aria-hidden="true">↗</span></div><div class="work-item-caption"><h2>${escape(work.name)}</h2><span>${escape(work.category)}</span></div></a>`).join('');
-      // Keep source/read order; center an unpaired work rather than leave a half-row hole.
-      let unpaired;
-      grid.querySelectorAll('.work-item').forEach(item => {
-        if (item.dataset.shape === 'wide') { unpaired?.classList.add('is-solo'); unpaired = null; }
-        else unpaired = unpaired ? null : item;
+      if (activeFilter === filter) return;
+      activeFilter = filter;
+      const previous = new Map();
+      grid.querySelectorAll('.work-item').forEach(card => {
+        card.getAnimations().forEach(animation => animation.cancel());
+        previous.set(card.dataset.work, card.getBoundingClientRect());
       });
-      unpaired?.classList.add('is-solo');
+      const matches = filter === 'all' ? curated : curated.filter(work => work.tags.includes(filter));
+      const children = [];
+      matches.forEach((work, index) => {
+        if (filter === 'all' && index === 6) children.push(more);
+        const card = cards.get(work.id);
+        card.className = `work-item ${filter === 'all' && index >= 6 ? 'work-item--compact' : [0, 3, 4].includes(index % 6) ? 'work-item--wide' : 'work-item--narrow'}`;
+        if (filter === 'aigc') card.className = `work-item ${index === 0 ? 'work-item--panorama' : 'work-item--half'}`;
+        else if (filter !== 'all' && matches.length % 2 && index === matches.length - 1) card.className = 'work-item work-item--last';
+        children.push(card);
+      });
+      grid.replaceChildren(...children);
       count.textContent = `${matches.length} 件作品`;
       filters.forEach(button => { const active = button.dataset.filter === filter; button.classList.toggle('is-active', active); button.setAttribute('aria-pressed', String(active)); });
-      if (animate && !reducedMotion()) grid.animate([{ opacity: .3, transform: 'translateY(12px)' }, { opacity: 1, transform: 'none' }], { duration: 240, easing: 'cubic-bezier(.16,1,.3,1)' });
+      if (animate && !reducedMotion()) matches.forEach((work, index) => {
+        const card = cards.get(work.id);
+        const before = previous.get(work.id);
+        const after = card.getBoundingClientRect();
+        const near = rect => rect.top < innerHeight && rect.bottom > 0;
+        const from = before && near(before) && near(after)
+          ? { transform: `translate(${before.left - after.left}px, ${before.top - after.top}px) scale(${before.width / after.width}, ${before.height / after.height})`, opacity: .65 }
+          : { transform: 'translateY(14px)', opacity: .2 };
+        card.animate([from, { transform: 'none', opacity: 1 }], { duration: 380, delay: Math.min(index * 30, 90), easing: 'cubic-bezier(.16,1,.3,1)' });
+      });
+      const toolbar = document.querySelector('.works-toolbar');
+      if (animate && grid.getBoundingClientRect().top < toolbar.getBoundingClientRect().bottom) grid.scrollIntoView({ block: 'start', behavior: reducedMotion() ? 'instant' : 'smooth' });
     };
     filters.forEach(button => button.addEventListener('click', () => {
       show(button.dataset.filter, true);
