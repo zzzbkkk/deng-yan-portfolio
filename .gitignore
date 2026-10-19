@@ -1,0 +1,15 @@
+# Only the deployable website, workflow and public README enter this repository.
+/*
+!/.gitignore
+!/README.md
+!/dist/
+!/.github/
+
+# Local tooling and operating-system files are never website assets.
+**/node_modules/
+**/__pycache__/
+**/.DS_Store
+**/Thumbs.db
+**/*.log
+**/.env
+**/.env.*
