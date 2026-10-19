@@ -202,7 +202,7 @@
 @media (min-width: 761px) and (max-height: 480px) {
   .hero, .hero-stage, .hero.has-scroll-motion { height: 500px; min-height: 500px; }
   .hero.has-scroll-motion .hero-stage { position: relative; }
-  .hero .hero-zoom, .hero .hero-top, .hero .hero-second { animation: none; }
+  .hero.has-scroll-motion .hero-zoom, .hero.has-scroll-motion .hero-top, .hero.has-scroll-motion .hero-second { animation: none; }
   .hero-art { height: 290px; }
   .hero-display { font-size: min(10.6vw, 90px); }
   .hero-second .hero-display { font-size: min(9.5vw, 80px); }
@@ -219,7 +219,7 @@
 @media (max-width: 760px) and (max-height: 699px) {
   .hero, .hero-stage, .hero.has-scroll-motion { height: 700px; min-height: 700px; }
   .hero.has-scroll-motion .hero-stage { position: relative; }
-  .hero .hero-zoom, .hero .hero-top, .hero .hero-second { animation: none; }
+  .hero.has-scroll-motion .hero-zoom, .hero.has-scroll-motion .hero-top, .hero.has-scroll-motion .hero-second { animation: none; }
   .hero-art { width: min(76vw, 300px); top: 46%; }
 }
 @media (prefers-reduced-motion: reduce) {
